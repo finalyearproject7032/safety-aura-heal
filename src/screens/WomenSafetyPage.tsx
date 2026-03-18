@@ -154,13 +154,20 @@ const WomenSafetyPage: React.FC = () => {
         </motion.button>
 
         {/* Voice SOS */}
-        <div className="glass-safety rounded-2xl p-4 mb-4">
+        <div className={`rounded-2xl p-4 mb-4 transition-all ${voiceStatus === 'detected' ? 'bg-emergency/20 border border-emergency/40' : 'glass-safety'}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Mic size={18} style={{ color: 'hsl(var(--safety))' }} />
+              {voiceOn && voiceStatus === 'listening'
+                ? <Mic size={18} className="animate-pulse" style={{ color: 'hsl(var(--safety))' }} />
+                : voiceStatus === 'error'
+                  ? <MicOff size={18} style={{ color: 'hsl(var(--emergency))' }} />
+                  : <Mic size={18} style={{ color: 'hsl(var(--safety))' }} />
+              }
               <div>
                 <div className="font-semibold text-sm">Voice SOS Trigger</div>
-                <div className="text-xs text-muted-foreground">Say "Help me" or "Emergency"</div>
+                <div className="text-xs text-muted-foreground">
+                  {voiceStatus === 'error' ? 'Mic permission denied' : 'Say "Help me" or "Emergency"'}
+                </div>
               </div>
             </div>
             <button onClick={toggleVoice}
@@ -170,12 +177,27 @@ const WomenSafetyPage: React.FC = () => {
           </div>
           {voiceOn && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="mt-3 pt-3 border-t border-safety/20">
-              <div className="flex items-center gap-2 text-xs text-safety">
-                <div className="flex gap-0.5">
-                  {[1,2,3,4,5].map(i => <div key={i} className="waveform-bar" style={{ height: `${8 + i * 3}px` }} />)}
+              {voiceStatus === 'error' ? (
+                <div className="text-xs text-emergency flex items-center gap-2">
+                  <MicOff size={12} /> Please allow microphone access in your browser settings
                 </div>
-                Listening for emergency keywords...
-              </div>
+              ) : voiceStatus === 'detected' ? (
+                <div className="flex items-center gap-2 text-xs text-emergency font-bold">
+                  <div className="w-2 h-2 rounded-full bg-emergency animate-ping" />
+                  🚨 Keyword detected! SOS triggered!
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-xs text-safety">
+                  <div className="flex gap-0.5 items-end">
+                    {[1,2,3,4,5].map(i => (
+                      <motion.div key={i} className="w-0.5 rounded-full bg-safety"
+                        animate={{ height: ['6px', `${8 + i * 4}px`, '6px'] }}
+                        transition={{ duration: 0.8, repeat: Infinity, delay: i * 0.1 }} />
+                    ))}
+                  </div>
+                  <span>{voiceStatus === 'listening' ? `Listening…${lastHeard ? ` "${lastHeard}"` : ''}` : 'Starting mic…'}</span>
+                </div>
+              )}
             </motion.div>
           )}
         </div>
