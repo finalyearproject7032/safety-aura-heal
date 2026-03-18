@@ -4,7 +4,7 @@ import { useApp } from '@/context/AppContext';
 import { PhoneCall, MapPin, X, MessageSquare } from 'lucide-react';
 
 const SOSOverlay: React.FC = () => {
-  const { user, cancelSOS, sosSmsSent, sosCountdown, location } = useApp();
+  const { user, cancelSOS, sosSmsSent, sosSmsFailed, sosCountdown, location } = useApp();
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
