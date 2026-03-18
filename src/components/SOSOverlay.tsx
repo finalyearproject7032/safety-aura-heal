@@ -168,7 +168,8 @@ const SOSOverlay: React.FC = () => {
           onClick={cancelSOS}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.97 }}
-          className="w-full py-4 rounded-2xl bg-white text-red-700 font-display font-black text-lg flex items-center justify-center gap-2 shadow-2xl"
+          className="w-full py-4 rounded-2xl bg-white font-display font-black text-lg flex items-center justify-center gap-2 shadow-2xl"
+          style={{ color: 'hsl(0,84%,40%)' }}
         >
           <X size={20} />
           CANCEL SOS ({sosCountdown}s)
