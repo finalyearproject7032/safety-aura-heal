@@ -29,7 +29,7 @@ const SOSOverlay: React.FC = () => {
           key={i}
           animate={{ scale: [1, 2 + i * 0.3], opacity: [0.4, 0] }}
           transition={{ repeat: Infinity, duration: 2, delay: i * 0.4, ease: 'easeOut' }}
-          className="absolute w-48 h-48 rounded-full border-2 border-red-400"
+          className="absolute w-48 h-48 rounded-full border-2 border-emergency"
         />
       ))}
 
