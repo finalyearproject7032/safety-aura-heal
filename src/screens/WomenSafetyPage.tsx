@@ -1,18 +1,117 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mic, Camera, MapPin, PhoneCall, Zap, Shield } from 'lucide-react';
+import { ArrowLeft, Mic, Camera, MapPin, PhoneCall, Shield, MicOff } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { BottomNav } from '@/components/Navigation';
 import { mockSafeZones } from '@/data/mockData';
+
+// Extend Window for SpeechRecognition
+interface ISpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start(): void;
+  stop(): void;
+  onstart: (() => void) | null;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+}
+declare global {
+  interface Window {
+    SpeechRecognition: new () => ISpeechRecognition;
+    webkitSpeechRecognition: new () => ISpeechRecognition;
+  }
+}
+
+const EMERGENCY_KEYWORDS = ['help me', 'emergency', 'help', 'bachao', 'mayday', 'sos'];
 
 const WomenSafetyPage: React.FC = () => {
   const navigate = useNavigate();
   const { triggerSOS, user } = useApp();
   const [voiceOn, setVoiceOn] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState<'idle' | 'listening' | 'detected' | 'error'>('idle');
+  const [lastHeard, setLastHeard] = useState('');
   const [recording, setRecording] = useState(false);
   const [recTime, setRecTime] = useState(0);
   const recInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recognitionRef = useRef<ISpeechRecognition | null>(null);
+  const restartRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const stopRecognition = useCallback(() => {
+    if (restartRef.current) clearTimeout(restartRef.current);
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch { /* ignore */ }
+      recognitionRef.current = null;
+    }
+    setVoiceStatus('idle');
+  }, []);
+
+  const startRecognition = useCallback(() => {
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRec) {
+      setVoiceStatus('error');
+      return;
+    }
+
+    const rec = new SpeechRec();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = 'en-IN';
+
+    rec.onstart = () => setVoiceStatus('listening');
+
+    rec.onresult = (event: SpeechRecognitionEvent) => {
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript.toLowerCase().trim();
+        setLastHeard(transcript);
+        const matched = EMERGENCY_KEYWORDS.some(kw => transcript.includes(kw));
+        if (matched) {
+          setVoiceStatus('detected');
+          triggerSOS();
+          // Brief pause then resume listening
+          restartRef.current = setTimeout(() => {
+            if (voiceOn) startRecognition();
+          }, 3000);
+          return;
+        }
+      }
+    };
+
+    rec.onerror = (e: SpeechRecognitionErrorEvent) => {
+      if (e.error === 'not-allowed') {
+        setVoiceStatus('error');
+        return;
+      }
+      // Auto-restart on other errors
+      restartRef.current = setTimeout(() => {
+        if (recognitionRef.current) startRecognition();
+      }, 1000);
+    };
+
+    rec.onend = () => {
+      // Auto-restart when it ends naturally (it stops after silence)
+      if (recognitionRef.current) {
+        restartRef.current = setTimeout(() => startRecognition(), 300);
+      }
+    };
+
+    recognitionRef.current = rec;
+    try { rec.start(); } catch { /* ignore duplicate start */ }
+  }, [triggerSOS, voiceOn]);
+
+  useEffect(() => {
+    if (voiceOn) {
+      startRecognition();
+    } else {
+      stopRecognition();
+      setLastHeard('');
+    }
+    return () => stopRecognition();
+  }, [voiceOn]);
+
+  const toggleVoice = () => setVoiceOn(v => !v);
 
   const toggleRecording = () => {
     if (!recording) {
@@ -24,8 +123,6 @@ const WomenSafetyPage: React.FC = () => {
       if (recInterval.current) clearInterval(recInterval.current);
     }
   };
-
-  const toggleVoice = () => setVoiceOn(v => !v);
 
   const fmt = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
@@ -57,13 +154,20 @@ const WomenSafetyPage: React.FC = () => {
         </motion.button>
 
         {/* Voice SOS */}
-        <div className="glass-safety rounded-2xl p-4 mb-4">
+        <div className={`rounded-2xl p-4 mb-4 transition-all ${voiceStatus === 'detected' ? 'bg-emergency/20 border border-emergency/40' : 'glass-safety'}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Mic size={18} style={{ color: 'hsl(var(--safety))' }} />
+              {voiceOn && voiceStatus === 'listening'
+                ? <Mic size={18} className="animate-pulse" style={{ color: 'hsl(var(--safety))' }} />
+                : voiceStatus === 'error'
+                  ? <MicOff size={18} style={{ color: 'hsl(var(--emergency))' }} />
+                  : <Mic size={18} style={{ color: 'hsl(var(--safety))' }} />
+              }
               <div>
                 <div className="font-semibold text-sm">Voice SOS Trigger</div>
-                <div className="text-xs text-muted-foreground">Say "Help me" or "Emergency"</div>
+                <div className="text-xs text-muted-foreground">
+                  {voiceStatus === 'error' ? 'Mic permission denied' : 'Say "Help me" or "Emergency"'}
+                </div>
               </div>
             </div>
             <button onClick={toggleVoice}
@@ -73,12 +177,27 @@ const WomenSafetyPage: React.FC = () => {
           </div>
           {voiceOn && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="mt-3 pt-3 border-t border-safety/20">
-              <div className="flex items-center gap-2 text-xs text-safety">
-                <div className="flex gap-0.5">
-                  {[1,2,3,4,5].map(i => <div key={i} className="waveform-bar" style={{ height: `${8 + i * 3}px` }} />)}
+              {voiceStatus === 'error' ? (
+                <div className="text-xs text-emergency flex items-center gap-2">
+                  <MicOff size={12} /> Please allow microphone access in your browser settings
                 </div>
-                Listening for emergency keywords...
-              </div>
+              ) : voiceStatus === 'detected' ? (
+                <div className="flex items-center gap-2 text-xs text-emergency font-bold">
+                  <div className="w-2 h-2 rounded-full bg-emergency animate-ping" />
+                  🚨 Keyword detected! SOS triggered!
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-xs text-safety">
+                  <div className="flex gap-0.5 items-end">
+                    {[1,2,3,4,5].map(i => (
+                      <motion.div key={i} className="w-0.5 rounded-full bg-safety"
+                        animate={{ height: ['6px', `${8 + i * 4}px`, '6px'] }}
+                        transition={{ duration: 0.8, repeat: Infinity, delay: i * 0.1 }} />
+                    ))}
+                  </div>
+                  <span>{voiceStatus === 'listening' ? `Listening…${lastHeard ? ` "${lastHeard}"` : ''}` : 'Starting mic…'}</span>
+                </div>
+              )}
             </motion.div>
           )}
         </div>
