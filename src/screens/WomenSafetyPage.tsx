@@ -1,18 +1,106 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mic, Camera, MapPin, PhoneCall, Zap, Shield } from 'lucide-react';
+import { ArrowLeft, Mic, Camera, MapPin, PhoneCall, Shield, MicOff } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { BottomNav } from '@/components/Navigation';
 import { mockSafeZones } from '@/data/mockData';
+
+// Extend Window for SpeechRecognition
+declare global {
+  interface Window {
+    SpeechRecognition: typeof SpeechRecognition;
+    webkitSpeechRecognition: typeof SpeechRecognition;
+  }
+}
+
+const EMERGENCY_KEYWORDS = ['help me', 'emergency', 'help', 'bachao', 'mayday', 'sos'];
 
 const WomenSafetyPage: React.FC = () => {
   const navigate = useNavigate();
   const { triggerSOS, user } = useApp();
   const [voiceOn, setVoiceOn] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState<'idle' | 'listening' | 'detected' | 'error'>('idle');
+  const [lastHeard, setLastHeard] = useState('');
   const [recording, setRecording] = useState(false);
   const [recTime, setRecTime] = useState(0);
   const recInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const restartRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const stopRecognition = useCallback(() => {
+    if (restartRef.current) clearTimeout(restartRef.current);
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch { /* ignore */ }
+      recognitionRef.current = null;
+    }
+    setVoiceStatus('idle');
+  }, []);
+
+  const startRecognition = useCallback(() => {
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRec) {
+      setVoiceStatus('error');
+      return;
+    }
+
+    const rec = new SpeechRec();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = 'en-IN';
+
+    rec.onstart = () => setVoiceStatus('listening');
+
+    rec.onresult = (event: SpeechRecognitionEvent) => {
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript.toLowerCase().trim();
+        setLastHeard(transcript);
+        const matched = EMERGENCY_KEYWORDS.some(kw => transcript.includes(kw));
+        if (matched) {
+          setVoiceStatus('detected');
+          triggerSOS();
+          // Brief pause then resume listening
+          restartRef.current = setTimeout(() => {
+            if (voiceOn) startRecognition();
+          }, 3000);
+          return;
+        }
+      }
+    };
+
+    rec.onerror = (e: SpeechRecognitionErrorEvent) => {
+      if (e.error === 'not-allowed') {
+        setVoiceStatus('error');
+        return;
+      }
+      // Auto-restart on other errors
+      restartRef.current = setTimeout(() => {
+        if (recognitionRef.current) startRecognition();
+      }, 1000);
+    };
+
+    rec.onend = () => {
+      // Auto-restart when it ends naturally (it stops after silence)
+      if (recognitionRef.current) {
+        restartRef.current = setTimeout(() => startRecognition(), 300);
+      }
+    };
+
+    recognitionRef.current = rec;
+    try { rec.start(); } catch { /* ignore duplicate start */ }
+  }, [triggerSOS, voiceOn]);
+
+  useEffect(() => {
+    if (voiceOn) {
+      startRecognition();
+    } else {
+      stopRecognition();
+      setLastHeard('');
+    }
+    return () => stopRecognition();
+  }, [voiceOn]);
+
+  const toggleVoice = () => setVoiceOn(v => !v);
 
   const toggleRecording = () => {
     if (!recording) {
@@ -24,8 +112,6 @@ const WomenSafetyPage: React.FC = () => {
       if (recInterval.current) clearInterval(recInterval.current);
     }
   };
-
-  const toggleVoice = () => setVoiceOn(v => !v);
 
   const fmt = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
