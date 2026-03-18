@@ -36,7 +36,7 @@ const WomenSafetyPage: React.FC = () => {
   const [recording, setRecording] = useState(false);
   const [recTime, setRecTime] = useState(0);
   const recInterval = useRef<ReturnType<typeof setInterval> | null>(null);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const recognitionRef = useRef<ISpeechRecognition | null>(null);
   const restartRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const stopRecognition = useCallback(() => {
