@@ -4,7 +4,7 @@ import { useApp } from '@/context/AppContext';
 import { PhoneCall, MapPin, X, MessageSquare } from 'lucide-react';
 
 const SOSOverlay: React.FC = () => {
-  const { user, cancelSOS, sosSmsSent, sosCountdown, location } = useApp();
+  const { user, cancelSOS, sosSmsSent, sosSmsFailed, sosCountdown, location } = useApp();
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
@@ -29,7 +29,7 @@ const SOSOverlay: React.FC = () => {
           key={i}
           animate={{ scale: [1, 2 + i * 0.3], opacity: [0.4, 0] }}
           transition={{ repeat: Infinity, duration: 2, delay: i * 0.4, ease: 'easeOut' }}
-          className="absolute w-48 h-48 rounded-full border-2 border-red-400"
+          className="absolute w-48 h-48 rounded-full border-2 border-emergency"
         />
       ))}
 
@@ -117,6 +117,21 @@ const SOSOverlay: React.FC = () => {
             </motion.div>
           ))}
 
+          {!sosSmsSent && !sosSmsFailed && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/10"
+            >
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+                className="w-3 h-3 rounded-full border-2 border-white/30 border-t-white flex-shrink-0"
+              />
+              <span className="text-white/60 text-xs">Sending SMS to emergency contacts...</span>
+            </motion.div>
+          )}
+
           {sosSmsSent && (
             <motion.div
               initial={{ opacity: 0, y: 8 }}
@@ -124,7 +139,26 @@ const SOSOverlay: React.FC = () => {
               className="flex items-center gap-3 p-3 rounded-xl bg-success/15 border border-success/30"
             >
               <MessageSquare size={14} className="text-success" />
-              <span className="text-success text-xs font-medium">✓ SMS Alert Sent via Twilio to Family</span>
+              <div>
+                <div className="text-success text-xs font-bold">✓ SMS Alert Sent via Twilio</div>
+                <div className="text-success/70 text-[10px] mt-0.5">
+                  Name · Location · Blood Group · Phone sent to {user?.emergencyContacts.length || 0} contact{(user?.emergencyContacts.length || 0) !== 1 ? 's' : ''}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {sosSmsFailed && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-center gap-3 p-3 rounded-xl bg-warning/15 border border-warning/30"
+            >
+              <MessageSquare size={14} className="text-warning" />
+              <div>
+                <div className="text-warning text-xs font-bold">⚠ SMS could not be sent</div>
+                <div className="text-warning/70 text-[10px] mt-0.5">Check Twilio config. Services alerted manually.</div>
+              </div>
             </motion.div>
           )}
         </div>
@@ -134,7 +168,8 @@ const SOSOverlay: React.FC = () => {
           onClick={cancelSOS}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.97 }}
-          className="w-full py-4 rounded-2xl bg-white text-red-700 font-display font-black text-lg flex items-center justify-center gap-2 shadow-2xl"
+          className="w-full py-4 rounded-2xl bg-white font-display font-black text-lg flex items-center justify-center gap-2 shadow-2xl"
+          style={{ color: 'hsl(0,84%,40%)' }}
         >
           <X size={20} />
           CANCEL SOS ({sosCountdown}s)
