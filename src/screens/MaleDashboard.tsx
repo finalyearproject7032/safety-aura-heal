@@ -63,24 +63,38 @@ const MaleDashboard: React.FC = () => {
           </div>
         </motion.header>
 
-        {/* SOS Button */}
+        {/* SOS Button — full red, prominent, impossible to miss */}
         <motion.button
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          whileTap={{ scale: 0.95 }}
+          whileTap={{ scale: 0.94 }}
           onClick={triggerSOS}
-          className="w-full mb-5 p-4 rounded-2xl relative overflow-hidden flex items-center gap-4"
-          style={{ background: 'linear-gradient(135deg, hsl(0,84%,50%,0.15), hsl(0,84%,50%,0.05))', border: '1px solid hsl(var(--emergency) / 0.3)' }}
+          className="w-full mb-5 h-24 rounded-2xl relative overflow-hidden flex items-center gap-5 px-6"
+          style={{ background: 'linear-gradient(135deg, hsl(0,84%,44%), hsl(0,90%,28%))' }}
         >
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: 'hsl(var(--emergency) / 0.15)' }}>
-            <ShieldAlert size={24} style={{ color: 'hsl(var(--emergency))' }} />
+          {/* Radial highlight */}
+          <div className="absolute inset-0 pointer-events-none"
+            style={{ background: 'radial-gradient(circle at 25% 35%, rgba(255,255,255,0.18), transparent 65%)' }} />
+          {/* Pulsing ring */}
+          <motion.div
+            animate={{ scale: [1, 1.6], opacity: [0.35, 0] }}
+            transition={{ repeat: Infinity, duration: 1.4, ease: 'easeOut' }}
+            className="absolute left-6 w-12 h-12 rounded-full border-2 border-white/50"
+          />
+          <div className="relative z-10 w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0 backdrop-blur-sm border border-white/30">
+            <ShieldAlert size={26} className="text-white" />
           </div>
-          <div className="flex-1 text-left">
-            <div className="font-display font-bold text-emergency">Emergency SOS</div>
-            <div className="text-xs text-muted-foreground">Tap to send alert to contacts & services</div>
+          <div className="relative z-10 flex-1 text-left">
+            <div className="font-display font-black text-xl text-white tracking-wide">EMERGENCY SOS</div>
+            <div className="text-white/70 text-xs mt-0.5">Sends SMS alert + location to contacts</div>
           </div>
-          <ChevronRight size={18} style={{ color: 'hsl(var(--emergency))' }} />
+          <motion.div
+            animate={{ x: [0, 4, 0] }}
+            transition={{ repeat: Infinity, duration: 1.2 }}
+            className="relative z-10"
+          >
+            <ChevronRight size={22} className="text-white/80" />
+          </motion.div>
         </motion.button>
 
         {/* Live Vitals */}

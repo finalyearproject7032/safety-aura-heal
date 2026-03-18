@@ -1,4 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+);
 
 export type UserRole = 'user' | 'admin';
 export type UserGender = 'male' | 'female' | 'other';
@@ -44,14 +50,13 @@ interface AppContextType {
   location: Location | null;
   setLocation: (l: Location | null) => void;
   sosSmsSent: boolean;
+  sosSmsFailed: boolean;
   isLoading: boolean;
   setIsLoading: (v: boolean) => void;
   sosCountdown: number;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
-
-const SOS_WEBHOOK = 'https://n8n.placeholder-webhook.com/sos';
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AppUser | null>(() => {
@@ -61,10 +66,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isSOS, setIsSOS] = useState(false);
   const [location, setLocation] = useState<Location | null>(null);
   const [sosSmsSent, setSosSmsSent] = useState(false);
+  const [sosSmsFailed, setSosSmsFailed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [sosCountdown, setSosCountdown] = useState(30);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Audio refs for continuous looping siren
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const sirenActiveRef = useRef(false);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const sirenTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -74,7 +84,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [user]);
 
-  // Get geolocation
+  // Get geolocation once on mount
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -98,57 +108,113 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, []);
 
+  // ─── Continuous looping siren using Web Audio API ───────────────────
+  const startSiren = () => {
+    if (sirenActiveRef.current) return;
+    sirenActiveRef.current = true;
+
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      audioCtxRef.current = ctx;
+
+      const playLoop = () => {
+        if (!sirenActiveRef.current) return;
+        // One siren cycle: hi-low sweep × 4 = ~2s, then repeat
+        const cycleDuration = 2.0;
+        const beepCount = 4;
+        for (let i = 0; i < beepCount; i++) {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+
+          const startT = ctx.currentTime + (i * cycleDuration) / beepCount;
+          const dur = cycleDuration / beepCount - 0.04;
+
+          // Sweep from 880 Hz down to 660 Hz
+          osc.frequency.setValueAtTime(880, startT);
+          osc.frequency.linearRampToValueAtTime(660, startT + dur);
+
+          gain.gain.setValueAtTime(0.0, startT);
+          gain.gain.linearRampToValueAtTime(0.5, startT + 0.02);
+          gain.gain.setValueAtTime(0.5, startT + dur - 0.05);
+          gain.gain.linearRampToValueAtTime(0.0, startT + dur);
+
+          osc.start(startT);
+          osc.stop(startT + dur);
+        }
+
+        sirenTimeoutRef.current = setTimeout(() => {
+          if (sirenActiveRef.current) playLoop();
+        }, cycleDuration * 1000);
+      };
+
+      playLoop();
+    } catch {
+      // Browser may block audio — silently ignore
+    }
+  };
+
+  const stopSiren = () => {
+    sirenActiveRef.current = false;
+    if (sirenTimeoutRef.current) {
+      clearTimeout(sirenTimeoutRef.current);
+      sirenTimeoutRef.current = null;
+    }
+    if (audioCtxRef.current) {
+      try { audioCtxRef.current.close(); } catch { /* ignore */ }
+      audioCtxRef.current = null;
+    }
+  };
+
+  // ─── Send real SMS via Supabase Edge Function ─────────────────────────
+  const sendSOSSms = async (currentLocation: Location | null, currentUser: AppUser) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('send-sos-sms', {
+        body: {
+          name: currentUser.name,
+          phone: currentUser.phone,
+          gender: currentUser.gender,
+          bloodGroup: currentUser.medicalInfo?.bloodGroup,
+          emergencyContacts: currentUser.emergencyContacts,
+          location: currentLocation,
+          timestamp: new Date().toISOString(),
+        },
+      });
+
+      if (error) throw error;
+      if (data?.success) {
+        setSosSmsSent(true);
+        setSosSmsFailed(false);
+      } else {
+        setSosSmsFailed(true);
+      }
+    } catch (err) {
+      console.error('SMS send failed:', err);
+      setSosSmsFailed(true);
+    }
+  };
+
   const triggerSOS = () => {
     setIsSOS(true);
     setSosSmsSent(false);
+    setSosSmsFailed(false);
     setSosCountdown(30);
 
-    // Vibrate
+    // Vibrate pattern (loops on supported devices)
     if (navigator.vibrate) {
-      navigator.vibrate([500, 200, 500, 200, 1000]);
+      navigator.vibrate([500, 200, 500, 200, 1000, 300, 500, 200, 500]);
     }
 
-    // Simulate audio siren using Web Audio API
-    try {
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const playBeep = (freq: number, start: number, duration: number) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.frequency.value = freq;
-        gain.gain.setValueAtTime(0.3, ctx.currentTime + start);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + duration);
-        osc.start(ctx.currentTime + start);
-        osc.stop(ctx.currentTime + start + duration);
-      };
-      for (let i = 0; i < 8; i++) {
-        playBeep(880, i * 0.5, 0.3);
-        playBeep(660, i * 0.5 + 0.25, 0.25);
-      }
-    } catch {
-      // ignore
+    // Start continuous looping siren
+    startSiren();
+
+    // Send real SMS after short delay (allow location to be used)
+    if (user) {
+      setTimeout(() => sendSOSSms(location, user), 1500);
     }
 
-    // Simulate webhook
-    setTimeout(() => {
-      fetch(SOS_WEBHOOK, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: user?.name,
-          phone: user?.phone,
-          gender: user?.gender,
-          emergencyContacts: user?.emergencyContacts,
-          location: location,
-          type: 'SOS',
-          timestamp: new Date().toISOString(),
-        }),
-      }).catch(() => {});
-      setSosSmsSent(true);
-    }, 2000);
-
-    // Countdown
+    // Countdown from 30
     let count = 30;
     countdownRef.current = setInterval(() => {
       count--;
@@ -162,18 +228,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const cancelSOS = () => {
     setIsSOS(false);
     setSosSmsSent(false);
+    setSosSmsFailed(false);
     setSosCountdown(30);
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
+    stopSiren();
     if (countdownRef.current) clearInterval(countdownRef.current);
   };
 
   return (
     <AppContext.Provider value={{
       user, setUser, isSOS, setIsSOS, triggerSOS, cancelSOS,
-      location, setLocation, sosSmsSent, isLoading, setIsLoading, sosCountdown,
+      location, setLocation, sosSmsSent, sosSmsFailed, isLoading, setIsLoading, sosCountdown,
     }}>
       {children}
     </AppContext.Provider>
