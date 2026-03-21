@@ -56,7 +56,7 @@ const RegisterPage: React.FC = () => {
       gender: form.gender as UserGender,
       role: form.role,
       emergencyContacts: form.emergencyContact1Name ? [
-        { name: form.emergencyContact1Name, phone: form.emergencyContact1Phone, relation: 'Emergency Contact' }
+        { name: form.emergencyContact1Name, phone: form.emergencyContact1Phone, email: form.emergencyContact1Email, relation: 'Emergency Contact' }
       ] : [],
       medicalInfo: {
         bloodGroup: form.bloodGroup || 'Unknown',
