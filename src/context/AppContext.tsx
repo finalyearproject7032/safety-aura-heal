@@ -167,30 +167,52 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // ─── Send real SMS via Supabase Edge Function ─────────────────────────
+  // ─── n8n webhook URL ─────────────────────────────────────────────────
+  const N8N_WEBHOOK_URL = 'https://finalpro1.app.n8n.cloud/webhook-test/c13188c3-072a-4aff-9f47-574fb51226b8';
+
+  // ─── Send SOS data to n8n webhook (n8n handles Twilio SMS) ───────────
   const sendSOSSms = async (currentLocation: Location | null, currentUser: AppUser) => {
     try {
-      const { data, error } = await supabase.functions.invoke('send-sos-sms', {
-        body: {
-          name: currentUser.name,
-          phone: currentUser.phone,
-          gender: currentUser.gender,
-          bloodGroup: currentUser.medicalInfo?.bloodGroup,
-          emergencyContacts: currentUser.emergencyContacts,
-          location: currentLocation,
-          timestamp: new Date().toISOString(),
-        },
+      const payload = {
+        type: 'SOS',
+        name: currentUser.name,
+        phone: currentUser.phone,
+        gender: currentUser.gender,
+        bloodGroup: currentUser.medicalInfo?.bloodGroup || 'N/A',
+        allergies: currentUser.medicalInfo?.allergies || [],
+        conditions: currentUser.medicalInfo?.conditions || [],
+        emergencyContacts: currentUser.emergencyContacts || [],
+        location: currentLocation
+          ? {
+              lat: currentLocation.lat,
+              lng: currentLocation.lng,
+              address: currentLocation.address,
+              mapsLink: `https://maps.google.com/?q=${currentLocation.lat},${currentLocation.lng}`,
+            }
+          : null,
+        timestamp: new Date().toISOString(),
+        message: `🚨 EMERGENCY SOS from ${currentUser.name} | 📱 ${currentUser.phone} | ⚧ ${currentUser.gender?.toUpperCase()} | 🩸 ${currentUser.medicalInfo?.bloodGroup || 'N/A'} | 📍 ${currentLocation ? `https://maps.google.com/?q=${currentLocation.lat},${currentLocation.lng}` : 'Location unavailable'}`,
+      };
+
+      console.log('🚨 Sending SOS to n8n webhook…', payload);
+
+      const res = await fetch(N8N_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
 
-      if (error) throw error;
-      if (data?.success) {
+      if (res.ok) {
         setSosSmsSent(true);
         setSosSmsFailed(false);
+        console.log('✅ n8n webhook triggered successfully');
       } else {
+        const errText = await res.text();
+        console.error('n8n webhook error:', res.status, errText);
         setSosSmsFailed(true);
       }
     } catch (err) {
-      console.error('SMS send failed:', err);
+      console.error('SOS webhook failed:', err);
       setSosSmsFailed(true);
     }
   };
