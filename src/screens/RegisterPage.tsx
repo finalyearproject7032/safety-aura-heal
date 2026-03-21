@@ -236,6 +236,14 @@ const RegisterPage: React.FC = () => {
                 </div>
 
                 <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Emergency Contact Email</label>
+                  <div className="relative">
+                    <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <input type="email" value={form.emergencyContact1Email} onChange={e => update('emergencyContact1Email', e.target.value)} placeholder="emergency@email.com" className="aegis-input pl-10" />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
                   <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Blood Group</label>
                   <select value={form.bloodGroup} onChange={e => update('bloodGroup', e.target.value)} className="aegis-input">
                     <option value="">Select blood group</option>

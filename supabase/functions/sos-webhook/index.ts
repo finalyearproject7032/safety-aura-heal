@@ -27,6 +27,13 @@ serve(async (req) => {
       timestamp,
     } = body;
 
+    // Build per-contact list for easy iteration in n8n
+    const contactsSummary = (emergencyContacts || [])
+      .map((c: { name: string; phone: string; email?: string; relation: string }, i: number) =>
+        `Contact ${i + 1}: ${c.name} (${c.relation}) | 📱 ${c.phone}${c.email ? ` | 📧 ${c.email}` : ''}`
+      )
+      .join('\n') || 'None provided';
+
     const mapsLink = location
       ? `https://maps.google.com/?q=${location.lat},${location.lng}`
       : null;
