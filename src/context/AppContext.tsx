@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
 export type UserRole = 'user' | 'admin';
 export type UserGender = 'male' | 'female' | 'other';
