@@ -22,6 +22,7 @@ const RegisterPage: React.FC = () => {
     role: 'user' as UserRole,
     emergencyContact1Name: '',
     emergencyContact1Phone: '',
+    emergencyContact1Email: '',
     bloodGroup: '',
   });
 
