@@ -1,10 +1,4 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
-);
 
 export type UserRole = 'user' | 'admin';
 export type UserGender = 'male' | 'female' | 'other';
