@@ -7,6 +7,7 @@ export type UserGender = 'male' | 'female' | 'other';
 export interface EmergencyContact {
   name: string;
   phone: string;
+  email?: string;
   relation: string;
 }
 

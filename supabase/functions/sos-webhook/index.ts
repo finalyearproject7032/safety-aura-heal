@@ -27,6 +27,13 @@ serve(async (req) => {
       timestamp,
     } = body;
 
+    // Build per-contact list for easy iteration in n8n
+    const contactsSummary = (emergencyContacts || [])
+      .map((c: { name: string; phone: string; email?: string; relation: string }, i: number) =>
+        `Contact ${i + 1}: ${c.name} (${c.relation}) | 📱 ${c.phone}${c.email ? ` | 📧 ${c.email}` : ''}`
+      )
+      .join('\n') || 'None provided';
+
     const mapsLink = location
       ? `https://maps.google.com/?q=${location.lat},${location.lng}`
       : null;
@@ -39,7 +46,14 @@ serve(async (req) => {
       bloodGroup: bloodGroup || 'N/A',
       allergies: allergies || [],
       conditions: conditions || [],
-      emergencyContacts: emergencyContacts || [],
+      // Full emergency contacts array (each has name, phone, email?, relation)
+      emergencyContacts: (emergencyContacts || []).map((c: { name: string; phone: string; email?: string; relation: string }) => ({
+        name: c.name,
+        phone: c.phone,
+        email: c.email || null,
+        relation: c.relation,
+      })),
+      contactsSummary,
       location: location
         ? {
             lat: location.lat,
@@ -49,7 +63,7 @@ serve(async (req) => {
           }
         : null,
       timestamp: timestamp || new Date().toISOString(),
-      // Formatted SMS message that n8n / Twilio node can use directly
+      // Formatted SMS message — use directly in Twilio node's message body
       smsMessage: [
         `🚨 EMERGENCY SOS ALERT 🚨`,
         ``,
@@ -61,11 +75,15 @@ serve(async (req) => {
         mapsLink
           ? `📍 Location: ${mapsLink}`
           : `📍 Location: Unable to detect`,
+        location ? `🌐 Coordinates: ${location.lat}, ${location.lng}` : '',
+        ``,
+        `📋 Emergency Contacts:`,
+        contactsSummary,
         ``,
         `⏰ Time: ${new Date(timestamp || Date.now()).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`,
         ``,
         `⚠️ This person needs IMMEDIATE help. Please call or contact emergency services (112).`,
-      ].join('\n'),
+      ].filter(Boolean).join('\n'),
     };
 
     console.log('Forwarding SOS payload to n8n:', JSON.stringify(payload));

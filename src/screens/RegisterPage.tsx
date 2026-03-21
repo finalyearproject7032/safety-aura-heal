@@ -22,6 +22,7 @@ const RegisterPage: React.FC = () => {
     role: 'user' as UserRole,
     emergencyContact1Name: '',
     emergencyContact1Phone: '',
+    emergencyContact1Email: '',
     bloodGroup: '',
   });
 
@@ -55,7 +56,7 @@ const RegisterPage: React.FC = () => {
       gender: form.gender as UserGender,
       role: form.role,
       emergencyContacts: form.emergencyContact1Name ? [
-        { name: form.emergencyContact1Name, phone: form.emergencyContact1Phone, relation: 'Emergency Contact' }
+        { name: form.emergencyContact1Name, phone: form.emergencyContact1Phone, email: form.emergencyContact1Email, relation: 'Emergency Contact' }
       ] : [],
       medicalInfo: {
         bloodGroup: form.bloodGroup || 'Unknown',
@@ -232,6 +233,14 @@ const RegisterPage: React.FC = () => {
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Emergency Phone</label>
                   <input type="tel" value={form.emergencyContact1Phone} onChange={e => update('emergencyContact1Phone', e.target.value)} placeholder="+91 XXXXX XXXXX" className="aegis-input" />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Emergency Contact Email</label>
+                  <div className="relative">
+                    <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <input type="email" value={form.emergencyContact1Email} onChange={e => update('emergencyContact1Email', e.target.value)} placeholder="emergency@email.com" className="aegis-input pl-10" />
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">
