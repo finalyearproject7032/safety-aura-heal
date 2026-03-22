@@ -1,15 +1,36 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
   ShieldAlert, Calendar, Activity, MapPin, FileText,
-  Heart, Thermometer, Droplets, Wind, LogOut, Brain, ChevronRight
+  Heart, Thermometer, Wind, LogOut, Brain, ChevronRight, Mic, MicOff
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { BottomNav, Sidebar } from '@/components/Navigation';
-import { GlassCard, VitalCard, SectionTitle, StaggerList, DashboardSkeleton } from '@/components/UIComponents';
+import { VitalCard, SectionTitle, StaggerList, DashboardSkeleton } from '@/components/UIComponents';
 import SOSOverlay from '@/components/SOSOverlay';
-import { mockDoctors, mockAppointments, mockVitals } from '@/data/mockData';
+import { mockDoctors, mockAppointments } from '@/data/mockData';
+
+// SpeechRecognition types
+interface ISpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start(): void;
+  stop(): void;
+  onstart: (() => void) | null;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+}
+declare global {
+  interface Window {
+    SpeechRecognition: new () => ISpeechRecognition;
+    webkitSpeechRecognition: new () => ISpeechRecognition;
+  }
+}
+
+const EMERGENCY_KEYWORDS = ['help me', 'emergency', 'help', 'bachao', 'mayday', 'sos'];
 
 const MaleDashboard: React.FC = () => {
   const { user, isSOS, triggerSOS, setUser } = useApp();
