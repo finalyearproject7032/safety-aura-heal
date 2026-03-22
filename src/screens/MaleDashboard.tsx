@@ -1,21 +1,101 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
   ShieldAlert, Calendar, Activity, MapPin, FileText,
-  Heart, Thermometer, Droplets, Wind, LogOut, Brain, ChevronRight
+  Heart, Thermometer, Wind, LogOut, Brain, ChevronRight, Mic, MicOff
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { BottomNav, Sidebar } from '@/components/Navigation';
-import { GlassCard, VitalCard, SectionTitle, StaggerList, DashboardSkeleton } from '@/components/UIComponents';
+import { VitalCard, SectionTitle, StaggerList, DashboardSkeleton } from '@/components/UIComponents';
 import SOSOverlay from '@/components/SOSOverlay';
-import { mockDoctors, mockAppointments, mockVitals } from '@/data/mockData';
+import { mockDoctors, mockAppointments } from '@/data/mockData';
+
+// SpeechRecognition types
+interface ISpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start(): void;
+  stop(): void;
+  onstart: (() => void) | null;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+}
+declare global {
+  interface Window {
+    SpeechRecognition: new () => ISpeechRecognition;
+    webkitSpeechRecognition: new () => ISpeechRecognition;
+  }
+}
+
+const EMERGENCY_KEYWORDS = ['help me', 'emergency', 'help', 'bachao', 'mayday', 'sos'];
 
 const MaleDashboard: React.FC = () => {
   const { user, isSOS, triggerSOS, setUser } = useApp();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [heartRate, setHeartRate] = useState(72);
+  const [voiceOn, setVoiceOn] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState<'idle' | 'listening' | 'detected' | 'error'>('idle');
+  const [lastHeard, setLastHeard] = useState('');
+  const recognitionRef = useRef<ISpeechRecognition | null>(null);
+  const restartRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const stopRecognition = useCallback(() => {
+    if (restartRef.current) clearTimeout(restartRef.current);
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch { /* ignore */ }
+      recognitionRef.current = null;
+    }
+    setVoiceStatus('idle');
+  }, []);
+
+  const startRecognition = useCallback(() => {
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRec) { setVoiceStatus('error'); return; }
+
+    const rec = new SpeechRec();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = 'en-IN';
+
+    rec.onstart = () => setVoiceStatus('listening');
+
+    rec.onresult = (event: SpeechRecognitionEvent) => {
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript.toLowerCase().trim();
+        setLastHeard(transcript);
+        if (EMERGENCY_KEYWORDS.some(kw => transcript.includes(kw))) {
+          setVoiceStatus('detected');
+          triggerSOS();
+          restartRef.current = setTimeout(() => { if (voiceOn) startRecognition(); }, 3000);
+          return;
+        }
+      }
+    };
+
+    rec.onerror = (e: SpeechRecognitionErrorEvent) => {
+      if (e.error === 'not-allowed') { setVoiceStatus('error'); return; }
+      restartRef.current = setTimeout(() => { if (recognitionRef.current) startRecognition(); }, 1000);
+    };
+
+    rec.onend = () => {
+      if (recognitionRef.current) {
+        restartRef.current = setTimeout(() => startRecognition(), 300);
+      }
+    };
+
+    recognitionRef.current = rec;
+    try { rec.start(); } catch { /* ignore */ }
+  }, [triggerSOS, voiceOn]);
+
+  useEffect(() => {
+    if (voiceOn) { startRecognition(); }
+    else { stopRecognition(); setLastHeard(''); }
+    return () => stopRecognition();
+  }, [voiceOn]);
 
   useEffect(() => {
     const t = setTimeout(() => setLoading(false), 1000);
@@ -182,6 +262,75 @@ const MaleDashboard: React.FC = () => {
             </motion.div>
           ))}
         </div>
+
+        {/* Voice SOS — blue themed */}
+        <SectionTitle title="Voice SOS" action={
+          voiceOn
+            ? <span className="badge-primary text-[10px]"><span className="pulse-dot pulse-dot-blue" />Active</span>
+            : <span className="text-xs text-muted-foreground">Tap to enable</span>
+        } />
+        <motion.div
+          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+          className={`rounded-2xl p-4 mb-6 transition-all duration-300 ${
+            voiceStatus === 'detected'
+              ? 'border border-emergency/40 bg-emergency/10'
+              : 'glass-card border border-primary/20'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
+                voiceOn && voiceStatus === 'listening'
+                  ? 'bg-primary/20 border border-primary/40'
+                  : 'bg-surface-2 border border-border'
+              }`}>
+                {voiceStatus === 'error'
+                  ? <MicOff size={18} style={{ color: 'hsl(var(--emergency))' }} />
+                  : <Mic size={18} style={{ color: voiceOn ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))' }}
+                      className={voiceOn && voiceStatus === 'listening' ? 'animate-pulse' : ''} />
+                }
+              </div>
+              <div>
+                <div className="font-semibold text-sm">Voice SOS Trigger</div>
+                <div className="text-xs text-muted-foreground">
+                  {voiceStatus === 'error' ? 'Mic permission denied' : 'Say "Help me" or "Emergency"'}
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => setVoiceOn(v => !v)}
+              className={`w-12 h-6 rounded-full transition-all duration-300 relative ${voiceOn ? 'bg-primary' : 'bg-surface-3 border border-border'}`}
+            >
+              <motion.div animate={{ x: voiceOn ? 24 : 2 }} className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm" />
+            </button>
+          </div>
+
+          {voiceOn && (
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="mt-3 pt-3 border-t border-primary/20">
+              {voiceStatus === 'error' ? (
+                <div className="text-xs text-emergency flex items-center gap-2">
+                  <MicOff size={12} /> Allow microphone access in browser settings
+                </div>
+              ) : voiceStatus === 'detected' ? (
+                <div className="flex items-center gap-2 text-xs text-emergency font-bold">
+                  <div className="w-2 h-2 rounded-full bg-emergency animate-ping" />
+                  🚨 Keyword detected! SOS triggered!
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-xs text-primary">
+                  <div className="flex gap-0.5 items-end">
+                    {[1,2,3,4,5].map(i => (
+                      <motion.div key={i} className="w-0.5 rounded-full bg-primary"
+                        animate={{ height: ['6px', `${8 + i * 4}px`, '6px'] }}
+                        transition={{ duration: 0.8, repeat: Infinity, delay: i * 0.1 }} />
+                    ))}
+                  </div>
+                  <span>{voiceStatus === 'listening' ? `Listening…${lastHeard ? ` "${lastHeard}"` : ''}` : 'Starting mic…'}</span>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </motion.div>
       </div>
 
       <BottomNav />
