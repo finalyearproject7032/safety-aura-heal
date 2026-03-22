@@ -18,15 +18,15 @@ const femaleNav: NavItem[] = [
   { icon: ShieldAlert, label: 'SOS', path: '/dashboard' },
   { icon: Navigation, label: 'Safe Zones', path: '/women-safety' },
   { icon: Calendar, label: 'Doctors', path: '/appointments' },
-  { icon: FileText, label: 'Records', path: '/records' },
+  { icon: User, label: 'Profile', path: '/profile' },
 ];
 
 const maleNav: NavItem[] = [
   { icon: Home, label: 'Home', path: '/dashboard' },
   { icon: Calendar, label: 'Book', path: '/appointments' },
-  { icon: MapPin, label: 'Ambulance', path: '/ambulance' },
   { icon: Activity, label: 'AI Doctor', path: '/ai-doctor' },
   { icon: FileText, label: 'Records', path: '/records' },
+  { icon: User, label: 'Profile', path: '/profile' },
 ];
 
 const adminNav: NavItem[] = [
