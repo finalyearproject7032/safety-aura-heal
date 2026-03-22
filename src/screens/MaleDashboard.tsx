@@ -37,6 +37,65 @@ const MaleDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [heartRate, setHeartRate] = useState(72);
+  const [voiceOn, setVoiceOn] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState<'idle' | 'listening' | 'detected' | 'error'>('idle');
+  const [lastHeard, setLastHeard] = useState('');
+  const recognitionRef = useRef<ISpeechRecognition | null>(null);
+  const restartRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const stopRecognition = useCallback(() => {
+    if (restartRef.current) clearTimeout(restartRef.current);
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch { /* ignore */ }
+      recognitionRef.current = null;
+    }
+    setVoiceStatus('idle');
+  }, []);
+
+  const startRecognition = useCallback(() => {
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRec) { setVoiceStatus('error'); return; }
+
+    const rec = new SpeechRec();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = 'en-IN';
+
+    rec.onstart = () => setVoiceStatus('listening');
+
+    rec.onresult = (event: SpeechRecognitionEvent) => {
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript.toLowerCase().trim();
+        setLastHeard(transcript);
+        if (EMERGENCY_KEYWORDS.some(kw => transcript.includes(kw))) {
+          setVoiceStatus('detected');
+          triggerSOS();
+          restartRef.current = setTimeout(() => { if (voiceOn) startRecognition(); }, 3000);
+          return;
+        }
+      }
+    };
+
+    rec.onerror = (e: SpeechRecognitionErrorEvent) => {
+      if (e.error === 'not-allowed') { setVoiceStatus('error'); return; }
+      restartRef.current = setTimeout(() => { if (recognitionRef.current) startRecognition(); }, 1000);
+    };
+
+    rec.onend = () => {
+      if (recognitionRef.current) {
+        restartRef.current = setTimeout(() => startRecognition(), 300);
+      }
+    };
+
+    recognitionRef.current = rec;
+    try { rec.start(); } catch { /* ignore */ }
+  }, [triggerSOS, voiceOn]);
+
+  useEffect(() => {
+    if (voiceOn) { startRecognition(); }
+    else { stopRecognition(); setLastHeard(''); }
+    return () => stopRecognition();
+  }, [voiceOn]);
 
   useEffect(() => {
     const t = setTimeout(() => setLoading(false), 1000);
