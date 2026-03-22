@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   ShieldAlert, Home, Calendar, FileText, MapPin, LogOut,
-  Mic, Camera, Navigation, PhoneCall, Activity, Zap, Menu, X
+  Mic, Camera, Navigation, PhoneCall, Activity, Zap, Menu, X, User
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 
