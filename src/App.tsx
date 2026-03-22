@@ -41,6 +41,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/ai-doctor" element={<ProtectedRoute><AIRecommender /></ProtectedRoute>} />
       <Route path="/women-safety" element={<ProtectedRoute><WomenSafetyPage /></ProtectedRoute>} />
       <Route path="/calculator" element={<ProtectedRoute><FakeCalculator /></ProtectedRoute>} />
+      <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
 
       {/* Protected - Admin */}
       <Route path="/admin" element={<ProtectedRoute adminOnly><HospitalDashboard /></ProtectedRoute>} />
