@@ -18,6 +18,7 @@ import HospitalDashboard from "@/screens/HospitalDashboard";
 import WomenSafetyPage from "@/screens/WomenSafetyPage";
 import FakeCalculator from "@/screens/FakeCalculator";
 import AIRecommender from "@/screens/AIRecommender";
+import ProfilePage from "@/screens/ProfilePage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
