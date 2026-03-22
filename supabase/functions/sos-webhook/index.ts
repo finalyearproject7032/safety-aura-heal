@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const N8N_WEBHOOK_URL = 'https://finalpro1.app.n8n.cloud/webhook-test/c13188c3-072a-4aff-9f47-574fb51226b8';
+const N8N_WEBHOOK_URL = 'https://finalpro1.app.n8n.cloud/webhook/c13188c3-072a-4aff-9f47-574fb51226b8';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
