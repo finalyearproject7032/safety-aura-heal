@@ -201,15 +201,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ isFemale, isAdmin }) => {
               </nav>
 
               <div className="p-3 border-t border-sidebar-border">
-                <div className="flex items-center gap-3 px-3 py-2 mb-2">
+                <div className="flex items-center gap-3 px-3 py-2 mb-2 cursor-pointer hover:bg-sidebar-accent/50 rounded-xl transition-all"
+                  onClick={() => { navigate('/profile'); setOpen(false); }}>
                   <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
                     style={{ background: 'hsl(var(--primary) / 0.2)', color: 'hsl(var(--primary))' }}>
                     {user?.name.charAt(0)}
                   </div>
-                  <div>
-                    <div className="text-sm font-medium text-sidebar-foreground">{user?.name}</div>
-                    <div className="text-[10px] text-muted-foreground">{user?.email}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-sidebar-foreground truncate">{user?.name}</div>
+                    <div className="text-[10px] text-muted-foreground truncate">{user?.email}</div>
                   </div>
+                  <User size={14} className="text-muted-foreground flex-shrink-0" />
                 </div>
                 <button onClick={handleLogout}
                   className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:text-emergency hover:bg-emergency/5 transition-all duration-200">
