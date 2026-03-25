@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Upload, FileText, Activity, Eye, Trash2 } from 'lucide-react';
+import { ArrowLeft, Upload, FileText, Activity, Eye, Trash2, FolderOpen } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { BottomNav } from '@/components/Navigation';
 import { useToast } from '@/hooks/use-toast';

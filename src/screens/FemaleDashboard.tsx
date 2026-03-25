@@ -1,15 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
   ShieldAlert, Mic, Camera, Navigation, PhoneCall, Zap,
-  Heart, MapPin, AlertTriangle, LogOut, Activity, Eye
+  Heart, MapPin, AlertTriangle, LogOut, Activity, Brain,
+  FileText, Upload, ChevronRight, Loader2
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { BottomNav, Sidebar } from '@/components/Navigation';
-import { GlassCard, StatCard, SectionTitle, StaggerList, DashboardSkeleton } from '@/components/UIComponents';
+import { StatCard, SectionTitle, StaggerList, DashboardSkeleton } from '@/components/UIComponents';
 import SOSOverlay from '@/components/SOSOverlay';
-import { mockSafeZones, mockVitals } from '@/data/mockData';
+import { mockSafeZones, mockMedicalRecords } from '@/data/mockData';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 const FemaleDashboard: React.FC = () => {
   const { user, isSOS, triggerSOS, setUser, location } = useApp();
