@@ -7,7 +7,6 @@ import {
   Upload, FolderOpen, Trash2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { mockMedicalRecords } from '@/data/mockData';
 import { useApp } from '@/context/AppContext';
 import { BottomNav, Sidebar } from '@/components/Navigation';
 import { VitalCard, SectionTitle, StaggerList, DashboardSkeleton } from '@/components/UIComponents';
