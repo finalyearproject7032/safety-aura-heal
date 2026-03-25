@@ -1,22 +1,33 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
   ShieldAlert, Mic, Camera, Navigation, PhoneCall, Zap,
-  Heart, MapPin, AlertTriangle, LogOut, Activity, Eye
+  Heart, MapPin, AlertTriangle, LogOut, Activity, Brain,
+  FileText, Upload, ChevronRight, Loader2, FolderOpen
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { BottomNav, Sidebar } from '@/components/Navigation';
-import { GlassCard, StatCard, SectionTitle, StaggerList, DashboardSkeleton } from '@/components/UIComponents';
+import { StatCard, SectionTitle, StaggerList, DashboardSkeleton } from '@/components/UIComponents';
 import SOSOverlay from '@/components/SOSOverlay';
-import { mockSafeZones, mockVitals } from '@/data/mockData';
+import { mockSafeZones, mockMedicalRecords } from '@/data/mockData';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 const FemaleDashboard: React.FC = () => {
   const { user, isSOS, triggerSOS, setUser, location } = useApp();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [voiceActive, setVoiceActive] = useState(false);
   const [safeZoneAlert, setSafeZoneAlert] = useState(false);
+  // AI Doctor quick widget
+  const [quickSymptoms, setQuickSymptoms] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState('');
+  // Health reports
+  const [records, setRecords] = useState(mockMedicalRecords);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setLoading(false), 1200);
@@ -28,6 +39,48 @@ const FemaleDashboard: React.FC = () => {
     return () => clearTimeout(t);
   }, []);
 
+  const handleQuickAI = async () => {
+    if (!quickSymptoms.trim()) return;
+    setAiLoading(true);
+    setAiResult('');
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-doctor', {
+        body: {
+          symptoms: quickSymptoms,
+          bloodGroup: user?.medicalInfo?.bloodGroup,
+          allergies: user?.medicalInfo?.allergies || [],
+          conditions: user?.medicalInfo?.conditions || [],
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setAiResult(data.advice || '');
+    } catch (err) {
+      toast({ title: '⚠️ AI Error', description: err instanceof Error ? err.message : 'Failed to get advice', variant: 'destructive' });
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const newRecords = Array.from(files).map(file => ({
+      id: `r${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      name: file.name,
+      date: new Date().toISOString().slice(0, 10),
+      type: file.type.includes('image') ? 'radiology' : 'lab',
+      doctor: 'Self Upload',
+      size: file.size > 1024 * 1024
+        ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+        : `${(file.size / 1024).toFixed(0)} KB`,
+      status: 'pending',
+    }));
+    setRecords(prev => [...newRecords, ...prev]);
+    toast({ title: `✅ ${newRecords.length} file(s) uploaded`, description: 'Added to your health records' });
+    e.target.value = '';
+  };
+
   if (isSOS) return <SOSOverlay />;
   if (loading) return <DashboardSkeleton />;
 
@@ -38,6 +91,10 @@ const FemaleDashboard: React.FC = () => {
         style={{ background: 'hsl(var(--safety))' }} />
 
       <Sidebar isFemale />
+
+      {/* Hidden real file input */}
+      <input ref={fileInputRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+        className="hidden" onChange={handleFileUpload} />
 
       <div className="max-w-lg mx-auto px-4">
         {/* Header */}
@@ -99,9 +156,7 @@ const FemaleDashboard: React.FC = () => {
             className="w-full h-40 rounded-3xl relative overflow-hidden flex flex-col items-center justify-center gap-2 group"
             style={{ background: 'linear-gradient(135deg, hsl(0,84%,55%), hsl(0,84%,30%))' }}
           >
-            {/* Radial shine */}
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.15),transparent_60%)]" />
-            {/* Pulse rings */}
             <motion.div
               animate={{ scale: [1, 1.3], opacity: [0.3, 0] }}
               transition={{ repeat: Infinity, duration: 1.8, ease: 'easeOut' }}
@@ -121,9 +176,7 @@ const FemaleDashboard: React.FC = () => {
         </motion.div>
 
         {/* Quick safety grid */}
-        <SectionTitle title="Safety Tools" action={
-          <span className="badge-safety">Active</span>
-        } />
+        <SectionTitle title="Safety Tools" action={<span className="badge-safety">Active</span>} />
         <StaggerList className="grid grid-cols-2 gap-3 mb-5">
           <StatCard icon={Mic} label="Voice SOS" value="Listening..." sub="Say 'Help Me'" active variant="safety"
             onClick={() => { setVoiceActive(!voiceActive); navigate('/women-safety'); }} />
@@ -132,7 +185,102 @@ const FemaleDashboard: React.FC = () => {
           <StatCard icon={Zap} label="Calculator" value="Decoy App" sub="123= → SOS" variant="safety" onClick={() => navigate('/calculator')} />
         </StaggerList>
 
-        {/* Quick Contacts */}
+        {/* ── AI Doctor Quick Widget ── */}
+        <SectionTitle title="AI Doctor" action={
+          <button onClick={() => navigate('/ai-doctor')} className="text-xs text-primary hover:underline flex items-center gap-1">
+            Full view <ChevronRight size={12} />
+          </button>
+        } />
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+          className="glass-card-glow rounded-2xl p-4 mb-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Brain size={16} className="text-primary" />
+            <span className="text-sm font-semibold">Quick Symptom Check</span>
+            <span className="ml-auto badge-primary text-[9px]">AI Powered</span>
+          </div>
+          <textarea
+            value={quickSymptoms}
+            onChange={e => setQuickSymptoms(e.target.value)}
+            placeholder="e.g. headache, fever, nausea..."
+            rows={2}
+            className="aegis-input resize-none text-sm mb-3"
+          />
+          <motion.button
+            onClick={handleQuickAI}
+            disabled={aiLoading || !quickSymptoms.trim()}
+            whileTap={{ scale: 0.97 }}
+            className="btn-primary w-full text-sm disabled:opacity-50 mb-3"
+          >
+            {aiLoading
+              ? <><Loader2 size={14} className="animate-spin" /> Analyzing…</>
+              : <><Brain size={14} /> Get AI Advice</>
+            }
+          </motion.button>
+          <AnimatePresence>
+            {aiResult && !aiLoading && (
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="bg-surface-2 rounded-xl p-3 border border-border/50 text-xs text-muted-foreground leading-relaxed max-h-40 overflow-y-auto">
+                {aiResult.split('\n').filter(l => l.trim()).slice(0, 8).map((line, i) => {
+                  const isH = /^\*\*|^#{1,3}\s|^[1-9]\./.test(line);
+                  return (
+                    <div key={i} className={isH ? 'font-semibold text-foreground mt-2 first:mt-0' : 'pl-1'}>
+                      {line.replace(/^#{1,3}\s*/, '').replace(/\*\*/g, '').replace(/^[1-9]\.\s*/, '')}
+                    </div>
+                  );
+                })}
+                <button onClick={() => navigate('/ai-doctor')} className="mt-2 text-primary text-[10px] font-medium hover:underline">
+                  See full analysis →
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+
+        {/* ── Health Reports Upload ── */}
+        <SectionTitle title="Health Reports" action={
+          <button onClick={() => navigate('/records')} className="text-xs text-primary hover:underline flex items-center gap-1">
+            View all <ChevronRight size={12} />
+          </button>
+        } />
+        {/* Upload button */}
+        <motion.button
+          whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
+          onClick={() => fileInputRef.current?.click()}
+          className="w-full glass-card rounded-xl p-4 mb-3 flex items-center gap-3 border-dashed border-2 border-border hover:border-primary/40 transition-all cursor-pointer"
+        >
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+            <Upload size={18} className="text-primary" />
+          </div>
+          <div className="text-left">
+            <div className="text-sm font-medium">Upload Report</div>
+            <div className="text-[10px] text-muted-foreground">PDF, JPG, PNG — tap to pick files</div>
+          </div>
+          <FolderOpen size={16} className="text-muted-foreground ml-auto" />
+        </motion.button>
+
+        {/* Recent records (latest 3) */}
+        <div className="space-y-2 mb-5">
+          {records.slice(0, 3).map((rec, i) => (
+            <motion.div key={rec.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05 }}
+              className="glass-card rounded-xl p-3 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: `hsl(var(--${rec.type === 'lab' ? 'primary' : rec.type === 'radiology' ? 'warning' : 'emergency'}) / 0.15)` }}>
+                <FileText size={15} style={{ color: `hsl(var(--${rec.type === 'lab' ? 'primary' : rec.type === 'radiology' ? 'warning' : 'emergency'}))` }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-xs truncate">{rec.name}</div>
+                <div className="text-[10px] text-muted-foreground">{rec.doctor} · {rec.date}</div>
+              </div>
+              <span className={rec.status === 'normal' ? 'badge-success' : 'badge-primary'}>
+                {rec.status}
+              </span>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Emergency Contacts */}
         <SectionTitle title="Emergency Contacts" />
         <div className="space-y-2 mb-5">
           {user?.emergencyContacts.length ? user.emergencyContacts.map((c, i) => (
