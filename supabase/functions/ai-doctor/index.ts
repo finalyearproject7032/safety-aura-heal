@@ -11,12 +11,77 @@ serve(async (req) => {
   }
 
   try {
-    const { symptoms, bloodGroup, allergies, conditions } = await req.json();
+    const body = await req.json();
+    const { symptoms, bloodGroup, allergies, conditions, fileBase64, fileMimeType, fileName, mode } = body;
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) throw new Error('LOVABLE_API_KEY is not configured');
 
-    const systemPrompt = `You are AegisMed AI Doctor — a knowledgeable medical assistant. 
+    let messages: unknown[];
+
+    // ── Mode: analyze uploaded medical document ──
+    if (mode === 'file' && fileBase64 && fileMimeType) {
+      const systemPrompt = `You are AegisMed AI Doctor — a medical document analyst.
+The user has uploaded a medical report/document. Analyze it thoroughly and provide:
+
+📋 **Document Summary**
+- What type of report this is (lab test, X-ray, ECG, prescription, etc.)
+- Key findings and values mentioned
+
+🔍 **Key Medical Insights**
+- What the results mean in simple language
+- Any values that are abnormal or out of range (highlight these clearly)
+- What conditions or risk factors they suggest
+
+💊 **Recommendations**
+- What specialist the patient should consult based on findings
+- Any immediate actions needed
+- Simple OTC remedies if applicable
+
+⚠️ **Red Flags**
+- Any urgent or critical values that need immediate attention
+
+RULES:
+- Use simple, clear language a non-medical person can understand
+- Always recommend consulting a real doctor
+- Format with clear sections and emojis for readability
+- If values are normal, clearly reassure the patient`;
+
+      const userContent: unknown[] = [
+        {
+          type: 'text',
+          text: `Please analyze this medical document (${fileName || 'uploaded file'}).
+Patient Profile:
+- Blood Group: ${bloodGroup || 'Not specified'}
+- Known Allergies: ${allergies?.length ? allergies.join(', ') : 'None'}
+- Existing Conditions: ${conditions?.length ? conditions.join(', ') : 'None'}
+
+Provide a detailed summary and medical insights.`,
+        },
+      ];
+
+      // Attach file as image (for images) or inline data (for PDFs)
+      if (fileMimeType.startsWith('image/')) {
+        userContent.push({
+          type: 'image_url',
+          image_url: { url: `data:${fileMimeType};base64,${fileBase64}` },
+        });
+      } else if (fileMimeType === 'application/pdf') {
+        // Gemini supports PDF inline
+        userContent.push({
+          type: 'image_url',
+          image_url: { url: `data:application/pdf;base64,${fileBase64}` },
+        });
+      }
+
+      messages = [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userContent },
+      ];
+
+    } else {
+      // ── Mode: symptom analysis (default) ──
+      const systemPrompt = `You are AegisMed AI Doctor — a knowledgeable medical assistant. 
 Analyze the user's symptoms and provide:
 1. Likely condition/diagnosis (brief)
 2. Recommended specialist to consult
@@ -31,7 +96,7 @@ IMPORTANT RULES:
 - Format your response in clear sections with emojis for readability
 - Consider the patient's blood group and any known allergies/conditions when advising`;
 
-    const userMessage = `
+      const userMessage = `
 Patient Profile:
 - Blood Group: ${bloodGroup || 'Not specified'}
 - Known Allergies: ${allergies?.length ? allergies.join(', ') : 'None'}
@@ -41,6 +106,12 @@ Symptoms: ${symptoms}
 
 Please analyze and provide medical guidance.`;
 
+      messages = [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage },
+      ];
+    }
+
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -48,11 +119,8 @@ Please analyze and provide medical guidance.`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-3-flash-preview',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userMessage },
-        ],
+        model: 'google/gemini-2.5-flash',
+        messages,
         stream: false,
       }),
     });
@@ -68,11 +136,12 @@ Please analyze and provide medical guidance.`;
           status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      throw new Error(`AI gateway error: ${response.status}`);
+      const errBody = await response.text();
+      throw new Error(`AI gateway error: ${response.status} — ${errBody}`);
     }
 
     const data = await response.json();
-    const advice = data.choices?.[0]?.message?.content || 'Unable to generate advice. Please consult a doctor.';
+    const advice = data.choices?.[0]?.message?.content || 'Unable to generate analysis. Please consult a doctor.';
 
     return new Response(JSON.stringify({ advice }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
