@@ -17,9 +17,17 @@ import { useToast } from '@/hooks/use-toast';
 const FemaleDashboard: React.FC = () => {
   const { user, isSOS, triggerSOS, setUser, location } = useApp();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [voiceActive, setVoiceActive] = useState(false);
   const [safeZoneAlert, setSafeZoneAlert] = useState(false);
+  // AI Doctor quick widget
+  const [quickSymptoms, setQuickSymptoms] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState('');
+  // Health reports
+  const [records, setRecords] = useState(mockMedicalRecords);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setLoading(false), 1200);
@@ -30,6 +38,48 @@ const FemaleDashboard: React.FC = () => {
     const t = setTimeout(() => setSafeZoneAlert(true), 3000);
     return () => clearTimeout(t);
   }, []);
+
+  const handleQuickAI = async () => {
+    if (!quickSymptoms.trim()) return;
+    setAiLoading(true);
+    setAiResult('');
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-doctor', {
+        body: {
+          symptoms: quickSymptoms,
+          bloodGroup: user?.medicalInfo?.bloodGroup,
+          allergies: user?.medicalInfo?.allergies || [],
+          conditions: user?.medicalInfo?.conditions || [],
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setAiResult(data.advice || '');
+    } catch (err) {
+      toast({ title: '⚠️ AI Error', description: err instanceof Error ? err.message : 'Failed to get advice', variant: 'destructive' });
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const newRecords = Array.from(files).map(file => ({
+      id: `r${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      name: file.name,
+      date: new Date().toISOString().slice(0, 10),
+      type: file.type.includes('image') ? 'radiology' : 'lab',
+      doctor: 'Self Upload',
+      size: file.size > 1024 * 1024
+        ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+        : `${(file.size / 1024).toFixed(0)} KB`,
+      status: 'pending',
+    }));
+    setRecords(prev => [...newRecords, ...prev]);
+    toast({ title: `✅ ${newRecords.length} file(s) uploaded`, description: 'Added to your health records' });
+    e.target.value = '';
+  };
 
   if (isSOS) return <SOSOverlay />;
   if (loading) return <DashboardSkeleton />;
