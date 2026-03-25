@@ -37,13 +37,35 @@ const EMERGENCY_KEYWORDS = ['help me', 'emergency', 'help', 'bachao', 'mayday', 
 const MaleDashboard: React.FC = () => {
   const { user, isSOS, triggerSOS, setUser } = useApp();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [heartRate, setHeartRate] = useState(72);
   const [voiceOn, setVoiceOn] = useState(false);
   const [voiceStatus, setVoiceStatus] = useState<'idle' | 'listening' | 'detected' | 'error'>('idle');
   const [lastHeard, setLastHeard] = useState('');
+  const [records, setRecords] = useState(mockMedicalRecords);
   const recognitionRef = useRef<ISpeechRecognition | null>(null);
   const restartRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const newRecords = Array.from(files).map(file => ({
+      id: `r${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      name: file.name,
+      date: new Date().toISOString().slice(0, 10),
+      type: ['jpg', 'jpeg', 'png'].includes(file.name.split('.').pop()?.toLowerCase() || '') ? 'radiology' : 'lab',
+      doctor: 'Self Upload',
+      size: file.size > 1024 * 1024
+        ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+        : `${(file.size / 1024).toFixed(0)} KB`,
+      status: 'pending',
+    }));
+    setRecords(prev => [...newRecords, ...prev]);
+    toast({ title: `✅ ${newRecords.length} file(s) uploaded`, description: newRecords.map(r => r.name).join(', ') });
+    e.target.value = '';
+  };
 
   const stopRecognition = useCallback(() => {
     if (restartRef.current) clearTimeout(restartRef.current);
