@@ -3,8 +3,11 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
   ShieldAlert, Calendar, Activity, MapPin, FileText,
-  Heart, Thermometer, Wind, LogOut, Brain, ChevronRight, Mic, MicOff
+  Heart, Thermometer, Wind, LogOut, Brain, ChevronRight, Mic, MicOff,
+  Upload, FolderOpen, Trash2
 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { mockMedicalRecords } from '@/data/mockData';
 import { useApp } from '@/context/AppContext';
 import { BottomNav, Sidebar } from '@/components/Navigation';
 import { VitalCard, SectionTitle, StaggerList, DashboardSkeleton } from '@/components/UIComponents';
