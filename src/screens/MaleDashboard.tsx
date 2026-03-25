@@ -355,6 +355,46 @@ const MaleDashboard: React.FC = () => {
             </motion.div>
           )}
         </motion.div>
+
+        {/* ── Health Reports Upload ── */}
+        <SectionTitle title="Health Reports" action={
+          <button onClick={() => navigate('/records')} className="text-xs text-primary hover:underline flex items-center gap-1">
+            View all <ChevronRight size={12} />
+          </button>
+        } />
+        <input ref={fileInputRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+          className="hidden" onChange={handleFileChange} />
+        <motion.button
+          whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
+          onClick={() => fileInputRef.current?.click()}
+          className="w-full glass-card rounded-xl p-4 mb-3 flex items-center gap-3 border-dashed border-2 border-border hover:border-primary/40 transition-all cursor-pointer"
+        >
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+            <Upload size={18} className="text-primary" />
+          </div>
+          <div className="text-left">
+            <div className="text-sm font-medium">Upload Report</div>
+            <div className="text-[10px] text-muted-foreground">PDF, JPG, PNG — tap to pick files</div>
+          </div>
+          <FolderOpen size={16} className="text-muted-foreground ml-auto" />
+        </motion.button>
+        <div className="space-y-2 mb-6">
+          {records.slice(0, 3).map((rec, i) => (
+            <motion.div key={rec.id} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05 }}
+              className="glass-card rounded-xl p-3 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: `hsl(var(--${rec.type === 'lab' ? 'primary' : rec.type === 'radiology' ? 'warning' : 'emergency'}) / 0.15)` }}>
+                <FileText size={15} style={{ color: `hsl(var(--${rec.type === 'lab' ? 'primary' : rec.type === 'radiology' ? 'warning' : 'emergency'}))` }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-xs truncate">{rec.name}</div>
+                <div className="text-[10px] text-muted-foreground">{rec.doctor} · {rec.date}</div>
+              </div>
+              <span className={rec.status === 'normal' ? 'badge-success' : 'badge-primary'}>{rec.status}</span>
+            </motion.div>
+          ))}
+        </div>
       </div>
 
       <BottomNav />
