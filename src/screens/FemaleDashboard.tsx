@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   ShieldAlert, Mic, Camera, Navigation, PhoneCall, Zap,
   Heart, MapPin, AlertTriangle, LogOut, Activity, Brain,
-  FileText, Upload, ChevronRight, Loader2
+  FileText, Upload, ChevronRight, Loader2, FolderOpen
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { BottomNav, Sidebar } from '@/components/Navigation';
