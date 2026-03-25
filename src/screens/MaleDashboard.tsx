@@ -12,7 +12,7 @@ import { useApp } from '@/context/AppContext';
 import { BottomNav, Sidebar } from '@/components/Navigation';
 import { VitalCard, SectionTitle, StaggerList, DashboardSkeleton } from '@/components/UIComponents';
 import SOSOverlay from '@/components/SOSOverlay';
-import { mockDoctors, mockAppointments } from '@/data/mockData';
+import { mockDoctors, mockAppointments, mockMedicalRecords } from '@/data/mockData';
 
 // SpeechRecognition types
 interface ISpeechRecognition extends EventTarget {
